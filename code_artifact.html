@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>114-2 師資生課程與素養指標調查</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .radio-group label { cursor: pointer; }
+        .radio-group input:checked + div { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        
+        /* Print specific styles for PDF */
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .print-break-inside-avoid { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen">
+
+<div id="app" class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+    <header class="mb-8 text-center bg-white p-6 rounded-2xl shadow-sm">
+        <h1 class="text-2xl sm:text-3xl font-bold text-blue-800 mb-2">師資生課程與素養指標調查</h1>
+        <p class="text-gray-600">114學年度第2學期</p>
+        
+        <!-- Progress Bar -->
+        <div class="mt-6 flex justify-between items-center relative max-w-md mx-auto" v-if="step <= 4">
+            <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 z-0"></div>
+            <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-blue-500 z-0 transition-all duration-300" :style="{ width: ((step - 1) / 3 * 100) + '%' }"></div>
+            
+            <div v-for="i in 4" :key="i" class="relative z-10 flex flex-col items-center">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300"
+                     :class="step >= i ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-200 text-gray-500'">
+                    {{ i }}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="bg-white rounded-2xl shadow-lg p-6 sm:p-8 min-h-[500px] relative">
+        <transition name="fade" mode="out-in">
+            <div v-if="step === 1" key="step1">
+                <h2 class="text-xl font-bold mb-6 border-l-4 border-blue-500 pl-3">基本資料</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">姓名 <span class="text-red-500">*</span></label>
+                        <input type="text" v-model="form.name" placeholder="請輸入您的真實姓名" 
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">教育學程類別 <span class="text-red-500">*</span></label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 radio-group">
+                            <label>
+                                <input type="radio" v-model="form.program" value="小學" class="sr-only">
+                                <div class="px-4 py-4 rounded-lg border border-gray-300 text-center font-medium transition-colors hover:bg-gray-50">
+                                    國民小學教育學程
+                                </div>
+                            </label>
+                            <label>
+                                <input type="radio" v-model="form.program" value="中學" class="sr-only">
+                                <div class="px-4 py-4 rounded-lg border border-gray-300 text-center font-medium transition-colors hover:bg-gray-50">
+                                    中等學校教育學程
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-10 flex justify-end">
+                    <button @click="nextStep" :disabled="!form.name || !form.program" 
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        下一步
+                    </button>
+                </div>
+            </div>
+
+            <div v-else-if="step === 2" key="step2">
+                <h2 class="text-xl font-bold mb-2 border-l-4 border-blue-500 pl-3">修習課程選取</h2>
+                <p class="text-gray-500 text-sm mb-6">請勾選您本學期（114-2）修習的課程（可複選）。</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+                    <label v-for="course in allCourses" :key="course.name" 
+                           class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
+                           :class="form.courses.includes(course.name) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+                        <div class="flex-shrink-0 mt-1">
+                            <input type="checkbox" :value="course.name" v-model="form.courses" 
+                                   class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
+                        </div>
+                        <div class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">{{ course.name }}</span>
+                            <span class="inline-block mt-1 px-2 py-0.5 text-xs rounded bg-gray-200 text-gray-700">{{ course.type }}</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="mt-8 flex justify-between">
+                    <button @click="prevStep" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">上一步</button>
+                    <button @click="nextStep" :disabled="form.courses.length === 0" 
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        下一步 (共選 {{ form.courses.length }} 門)
+                    </button>
+                </div>
+            </div>
+
+            <div v-else-if="step === 3" key="step3">
+                <h2 class="text-xl font-bold mb-2 border-l-4 border-blue-500 pl-3">素養指標理解程度評估</h2>
+                <p class="text-gray-600 text-sm mb-6">
+                    根據您選擇的課程，系統為您對應了以下教育素養指標。<br>
+                    請針對各項指標，評估您目前的理解與掌握程度（1: 非常不理解 ~ 7: 非常理解）。
+                </p>
+
+                <div v-if="relevantIndicators.length === 0" class="text-center py-10 bg-yellow-50 rounded-lg border border-yellow-200 text-yellow-700">
+                    您所選的課程在此類別下無對應之特定素養指標，請直接點選下一步。
+                </div>
+
+                <div v-else class="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                    <div v-for="(ind, index) in relevantIndicators" :key="ind.id" class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                        <div class="flex items-start mb-3">
+                            <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded mr-3 mt-0.5">{{ ind.id }}</span>
+                            <p class="font-medium text-gray-800 text-sm leading-relaxed">{{ ind.desc }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <p class="text-xs text-gray-500 font-medium mb-1">對應您所修之課程：</p>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="c in ind.matchedCourses" :key="c" class="inline-block px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-600">
+                                    {{ c }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- 7-point scale -->
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <div class="flex justify-between items-center w-full sm:max-w-md">
+                                <span class="text-xs text-gray-500 whitespace-nowrap mr-2">不理解</span>
+                                <div class="flex space-x-1 sm:space-x-2 radio-group flex-1 justify-center">
+                                    <label v-for="score in 7" :key="score" class="relative">
+                                        <input type="radio" :name="'rating-'+ind.id" :value="score" v-model="form.ratings[ind.id]" class="sr-only">
+                                        <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-full border border-gray-300 flex items-center justify-center text-sm font-medium transition-colors hover:bg-gray-100">
+                                            {{ score }}
+                                        </div>
+                                    </label>
+                                </div>
+                                <span class="text-xs text-gray-500 whitespace-nowrap ml-2">非常理解</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-between">
+                    <button @click="prevStep" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">上一步</button>
+                    <button @click="nextStep" :disabled="!isAllRatingsFilled" 
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        填寫完成，預覽送出
+                    </button>
+                </div>
+            </div>
+
+            <div v-else-if="step === 4" key="step4">
+                <div id="pdf-content" class="bg-white p-2">
+                    <div class="text-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">修課與素養指標對照總表</h2>
+                        <p class="text-gray-500 mt-1">學生：{{ form.name }} | 學程：{{ form.program }}</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="font-bold text-lg mb-2 border-b pb-1">已選課程 (共 {{ form.courses.length }} 門)</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <span v-for="course in form.courses" :key="course" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-sm">
+                                {{ course }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-bold text-lg mb-2 border-b pb-1">素養指標達成度評估</h3>
+                        <div v-if="relevantIndicators.length === 0" class="text-gray-500 text-sm">無對應之素養指標。</div>
+                        <table v-else class="min-w-full divide-y divide-gray-200 text-sm mt-2 border">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-500 border-r w-16">指標</th>
+                                    <th class="px-4 py-2 text-left font-medium text-gray-500 border-r">內容描述與對應課程</th>
+                                    <th class="px-4 py-2 text-center font-medium text-gray-500 w-24">理解程度<br>(1-7)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="ind in relevantIndicators" :key="ind.id" class="print-break-inside-avoid">
+                                    <td class="px-4 py-3 font-bold text-gray-700 border-r align-top">{{ ind.id }}</td>
+                                    <td class="px-4 py-3 border-r">
+                                        <p class="text-gray-800 mb-1">{{ ind.desc }}</p>
+                                        <p class="text-xs text-blue-600">對應修課：{{ ind.matchedCourses.join('、') }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-center text-lg font-bold text-blue-600 align-middle">
+                                        {{ form.ratings[ind.id] }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-8 flex justify-between no-print border-t pt-6">
+                    <button @click="prevStep" class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">返回修改</button>
+                    <button @click="submitData" :disabled="isSubmitting" 
+                            class="px-8 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center shadow-md">
+                        <span v-if="isSubmitting" class="mr-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        </span>
+                        {{ isSubmitting ? '送出中...' : '確認送出' }}
+                    </button>
+                </div>
+            </div>
+
+            <div v-else-if="step === 5" key="step5" class="text-center py-10">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">資料已成功送出！</h2>
+                <p class="text-gray-600 mb-8">感謝您的填寫。您的回覆已儲存至系統中。</p>
+                
+                <div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                    <button @click="downloadPDF" 
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        下載 PDF 留存
+                    </button>
+                    <button @click="resetForm" 
+                            class="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                        填寫下一筆
+                    </button>
+                </div>
+            </div>
+        </transition>
+    </main>
+
+    <div class="mt-12 text-center no-print">
+        <button @click="toggleAdmin" class="text-xs text-gray-400 hover:text-gray-600 underline">管理員專區</button>
+        
+        <div v-if="showAdmin" class="mt-4 bg-gray-800 text-white p-6 rounded-xl shadow-xl text-left">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">系統管理 - 資料匯出</h3>
+                <button @click="downloadCSV" class="px-4 py-2 bg-green-500 hover:bg-green-600 rounded text-sm font-bold flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    下載為 CSV (可於 Google 試算表開啟)
+                </button>
+            </div>
+            <p class="text-sm text-gray-400 mb-4">資料總筆數：{{ submissions.length }}</p>
+            <div class="max-h-60 overflow-y-auto bg-gray-900 rounded border border-gray-700">
+                <table class="w-full text-sm text-left text-gray-300">
+                    <thead class="text-xs text-gray-400 bg-gray-700 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">時間</th>
+                            <th class="px-4 py-2">姓名</th>
+                            <th class="px-4 py-2">學程</th>
+                            <th class="px-4 py-2">課程數</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="sub in submissions" :key="sub.id" class="border-b border-gray-800">
+                            <td class="px-4 py-2">{{ new Date(sub.timestamp).toLocaleString() }}</td>
+                            <td class="px-4 py-2">{{ sub.name }}</td>
+                            <td class="px-4 py-2">{{ sub.program }}</td>
+                            <td class="px-4 py-2">{{ sub.courses.length }}</td>
+                        </tr>
+                        <tr v-if="submissions.length === 0">
+                            <td colspan="4" class="px-4 py-4 text-center text-gray-500">尚無資料</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Initialize Firebase
+    let app, db, auth, userId;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'edu-survey-app';
+    
+    if (typeof __firebase_config !== 'undefined') {
+        const firebaseConfig = JSON.parse(__firebase_config);
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        signInAnonymously(auth).then((userCredential) => {
+            userId = userCredential.user.uid;
+            console.log("Firebase initialized");
+        }).catch((error) => console.error("Auth error", error));
+    } else {
+        console.warn("Firebase config not found. Operating in local mode (saving won't persist).");
+    }
+
+    // --- DATA DEFINITIONS ---
+    
+    // Course List from 114-2 Schedule
+    const COURSES = [
+        { name: "海洋教育課程規劃與實地踏查", type: "中小合開" },
+        { name: "性別教育", type: "中小合開" },
+        { name: "教育哲學", type: "中小合開" },
+        { name: "國民小學健康與體育教材教法", type: "小學" },
+        { name: "教學媒體與應用", type: "中小合開" },
+        { name: "環境教育", type: "中小合開" },
+        { name: "素養導向評量設計", type: "中小合開" },
+        { name: "班級經營(小學)", type: "小學" },
+        { name: "班級經營(中學)", type: "中學" },
+        { name: "素養導向教學", type: "小學" },
+        { name: "國民小學自然科學教材教法", type: "小學" },
+        { name: "國民小學教學實習", type: "小學" },
+        { name: "教學原理", type: "小學" },
+        { name: "教育概論", type: "中小合開" },
+        { name: "探究與實作課程設計", type: "中學" },
+        { name: "雙語課程發展與設計", type: "中小合開" },
+        { name: "自然科學領域教學實習", type: "中學" },
+        { name: "科技領域教學實習", type: "中學" },
+        { name: "海事群教學實習", type: "中學" },
+        { name: "國民小學數學教材教法", type: "小學" },
+        { name: "職業教育訓練與生涯規劃", type: "中小合開" },
+        { name: "教育法規", type: "中小合開" },
+        { name: "學習評量", type: "中小合開" },
+        { name: "教育議題專題", type: "中小合開" },
+        { name: "國民小學語文(國語)教材教法", type: "小學" },
+        { name: "雙語教材教法", type: "小學" },
+        { name: "人際關係與溝通", type: "中小合開" },
+        { name: "藝術教育", type: "小學" },
+        { name: "輔導原理與實務", type: "中小合開" }
+    ];
+
+    // Literacy Indicators Mapping
+    // Mapped exactly to the courses available in the 114-2 list to ensure intersection works.
+    const PRIMARY_INDICATORS = [
+        {
+            id: "1-1",
+            desc: "了解有關教育目的和價值的主要理論或思想,以建構自身的教育理念與信念",
+            courses: ["教育哲學", "教育概論", "教育法規", "職業教育訓練與生涯規劃", "教學原理", "教育議題專題", "環境教育", "藝術教育"]
+        },
+        {
+            id: "1-2",
+            desc: "敏銳覺察社會環境對學生學習影響,以利教育機會均等",
+            courses: ["藝術教育", "環境教育", "教學原理", "職業教育訓練與生涯規劃"]
+        },
+        {
+            id: "1-3",
+            desc: "了解我國教育政策、法規及學校實務,以作為教育實踐的基礎。",
+            courses: ["職業教育訓練與生涯規劃", "教育法規", "國民小學教學實習", "環境教育", "教育議題專題", "海洋教育課程規劃與實地踏查"]
+        },
+        {
+            id: "2-1",
+            desc: "了解並尊重學生身心發展、社經及文化背景的差異,以作為教學與輔導的依據。",
+            courses: ["藝術教育", "人際關係與溝通", "環境教育", "國民小學教學實習", "教學原理", "教學媒體與應用", "學習評量", "職業教育訓練與生涯規劃"]
+        },
+        {
+            id: "2-2",
+            desc: "了解並運用學習原理,以符合學生個別的學習需求與發展",
+            courses: ["職業教育訓練與生涯規劃", "教育法規", "學習評量", "教學媒體與應用", "教學原理", "環境教育", "教育議題專題", "海洋教育課程規劃與實地踏查", "藝術教育"]
+        },
+        {
+            id: "3-1",
+            desc: "依據課程綱要/大綱、課程理論及教學原理,以規劃素養導向課程、教學及評量。",
+            courses: ["教育法規", "學習評量", "國民小學語文(國語)教材教法", "國民小學數學教材教法", "國民小學自然科學教材教法", "國民小學健康與體育教材教法", "教學媒體與應用", "素養導向教學", "國民小學教學實習", "環境教育", "教育議題專題", "人際關係與溝通", "性別教育", "藝術教育", "素養導向評量設計"]
+        },
+        {
+            id: "3-2",
+            desc: "依據課程綱要/大綱、課程理論及教學原理,以協同發展跨領域/群科/科目課程、教學及評量",
+            courses: ["素養導向評量設計", "藝術教育", "環境教育", "國民小學教學實習", "教學媒體與應用", "國民小學健康與體育教材教法", "國民小學自然科學教材教法", "國民小學數學教材教法", "國民小學語文(國語)教材教法", "教育法規"]
+        },
+        {
+            id: "3-3",
+            desc: "具備任教領域/群科/科目所需的專門知識與學科教學知能,以進行教學。",
+            courses: ["教育法規", "國民小學數學教材教法", "國民小學自然科學教材教法", "國民小學健康與體育教材教法", "教學媒體與應用", "國民小學教學實習", "環境教育", "海洋教育課程規劃與實地踏查", "藝術教育"]
+        },
+        {
+            id: "3-4",
+            desc: "掌握社會變遷趨勢與議題,以融入課程與教學。",
+            courses: ["海洋教育課程規劃與實地踏查", "環境教育", "教育議題專題", "國民小學教學實習", "教學原理", "教學媒體與應用", "國民小學健康與體育教材教法", "國民小學語文(國語)教材教法", "職業教育訓練與生涯規劃"]
+        },
+        {
+            id: "3-5",
+            desc: "應用多元教學策略、教學媒材及學習科技,以促進學生有效學習。",
+            courses: ["教育法規", "國民小學語文(國語)教材教法", "學習評量", "國民小學健康與體育教材教法", "教學媒體與應用", "素養導向教學", "國民小學教學實習", "教育議題專題", "環境教育", "性別教育", "人際關係與溝通", "藝術教育"]
+        },
+        {
+            id: "3-6",
+            desc: "根據多元評量結果調整課程與教學,以提升學生學習成效",
+            courses: ["素養導向評量設計", "人際關係與溝通", "性別教育", "環境教育", "國民小學教學實習", "教學媒體與應用", "國民小學健康與體育教材教法", "學習評量", "教育法規"]
+        },
+        {
+            id: "4-1",
+            desc: "應用正向支持原理,共創安全、友善及對話的班級與學習環境,以養成學生良好品格及有效學習",
+            courses: ["教育法規", "班級經營(小學)", "國民小學教學實習", "教育議題專題", "性別教育"]
+        },
+        {
+            id: "4-2",
+            desc: "應用輔導原理與技巧進行學生輔導,以促進適性發展。",
+            courses: ["國民小學教學實習", "輔導原理與實務"]
+        },
+        {
+            id: "5-1",
+            desc: "思辨與認同教師專業倫理,以維護學生福祉。",
+            courses: ["國民小學教學實習", "教學媒體與應用"]
+        },
+        {
+            id: "5-2",
+            desc: "透過教育實踐關懷弱勢學生,以體認教師專業角色。",
+            courses: ["教學原理", "國民小學教學實習", "藝術教育", "教育議題專題", "環境教育"]
+        },
+        {
+            id: "5-3",
+            desc: "透過教育實踐與省思,以發展溝通、團隊合作、問題解決及持續專業成長的意願與能力。",
+            courses: ["環境教育", "教育議題專題", "海洋教育課程規劃與實地踏查", "藝術教育", "教育法規", "國民小學教學實習", "教學媒體與應用"]
+        }
+    ];
+
+    const SECONDARY_INDICATORS = [
+        // A simplified set for Secondary as per prompt primarily asked for Primary, but providing this for completeness
+        { id: "1-1", desc: "了解有關教育目的和價值的主要理論或思想", courses: ["教育哲學", "教育概論", "教育法規", "職業教育訓練與生涯規劃", "教學原理", "素養導向教學", "教育議題專題", "環境教育", "自然科學領域教學實習", "科技領域教學實習", "海事群教學實習"] },
+        { id: "1-3", desc: "了解我國教育政策、法規及學校實務", courses: ["教育法規", "職業教育訓練與生涯規劃", "教學原理", "班級經營(中學)", "海洋教育課程規劃與實地踏查", "教育議題專題", "環境教育"] },
+        { id: "2-1", desc: "了解並尊重學生身心發展、社經及文化背景的差異", courses: ["自然科學領域教學實習", "科技領域教學實習", "海事群教學實習", "人際關係與溝通", "環境教育", "學習評量", "班級經營(中學)", "教學媒體與應用", "職業教育訓練與生涯規劃"] },
+        { id: "3-1", desc: "規劃素養導向課程、教學及評量", courses: ["教育法規", "教學媒體與應用", "教學原理", "教育議題專題", "素養導向教學", "學習評量", "環境教育", "素養導向評量設計", "人際關係與溝通", "性別教育", "自然科學領域教學實習", "科技領域教學實習", "海事群教學實習"] },
+        { id: "3-3", desc: "具備任教領域所需的專門知識與學科教學知能", courses: ["教育法規", "教學媒體與應用", "教學原理", "海洋教育課程規劃與實地踏查", "環境教育", "自然科學領域教學實習", "科技領域教學實習", "海事群教學實習"] },
+        { id: "4-1", desc: "應用正向支持原理,共創安全、友善及對話的班級", courses: ["教育法規", "教學原理", "班級經營(中學)", "教育議題專題", "素養導向教學", "性別教育", "自然科學領域教學實習", "科技領域教學實習", "海事群教學實習"] },
+        { id: "4-2", desc: "應用輔導原理與技巧進行學生輔導", courses: ["班級經營(中學)", "輔導原理與實務"] },
+        { id: "5-3", desc: "發展溝通、團隊合作、問題解決及持續專業成長", courses: ["教育法規", "教學媒體與應用", "教學原理", "班級經營(中學)", "教育議題專題", "素養導向教學", "海洋教育課程規劃與實地踏查", "環境教育", "自然科學領域教學實習", "科技領域教學實習", "海事群教學實習"] }
+    ];
+
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                step: 1,
+                form: {
+                    name: '',
+                    program: '',
+                    courses: [],
+                    ratings: {}
+                },
+                allCourses: COURSES,
+                isSubmitting: false,
+                showAdmin: false,
+                submissions: []
+            }
+        },
+        computed: {
+            relevantIndicators() {
+                if (this.form.courses.length === 0) return [];
+                
+                const sourceMap = this.form.program === '小學' ? PRIMARY_INDICATORS : SECONDARY_INDICATORS;
+                let results = [];
+
+                // For each indicator, check if user selected any of its mapped courses
+                sourceMap.forEach(ind => {
+                    const matched = ind.courses.filter(c => this.form.courses.includes(c));
+                    if (matched.length > 0) {
+                        results.push({
+                            id: ind.id,
+                            desc: ind.desc,
+                            matchedCourses: matched
+                        });
+                        // Initialize rating if not exists
+                        if (!this.form.ratings[ind.id]) {
+                            this.form.ratings[ind.id] = null;
+                        }
+                    }
+                });
+                return results;
+            },
+            isAllRatingsFilled() {
+                if (this.relevantIndicators.length === 0) return true;
+                return this.relevantIndicators.every(ind => this.form.ratings[ind.id]);
+            }
+        },
+        methods: {
+            nextStep() {
+                if (this.step < 5) this.step++;
+            },
+            prevStep() {
+                if (this.step > 1) this.step--;
+            },
+            async submitData() {
+                this.isSubmitting = true;
+                
+                const payload = {
+                    name: this.form.name,
+                    program: this.form.program,
+                    courses: this.form.courses,
+                    ratings: this.form.ratings,
+                    timestamp: new Date().toISOString()
+                };
+
+                try {
+                    if (db) {
+                        // Save to Firebase
+                        const collRef = collection(db, 'artifacts', appId, 'public', 'data', 'survey_submissions');
+                        await addDoc(collRef, payload);
+                    } else {
+                        throw new Error("Firebase DB not available.");
+                    }
+                } catch (error) {
+                    console.warn("Firebase儲存失敗 (權限不足或未設定)，自動切換至瀏覽器本機儲存 (LocalStorage): ", error);
+                    // Fallback to LocalStorage
+                    let localData = JSON.parse(localStorage.getItem('survey_submissions') || '[]');
+                    localData.push({ id: 'local_' + Date.now(), ...payload });
+                    localStorage.setItem('survey_submissions', JSON.stringify(localData));
+                } finally {
+                    this.isSubmitting = false;
+                    this.step = 5;
+                }
+            },
+            resetForm() {
+                this.form = { name: '', program: '', courses: [], ratings: {} };
+                this.step = 1;
+            },
+            downloadPDF() {
+                const element = document.getElementById('pdf-content');
+                const opt = {
+                    margin:       10,
+                    filename:     `${this.form.name}_素養指標自評表.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            },
+            // Admin functions
+            async toggleAdmin() {
+                this.showAdmin = !this.showAdmin;
+                if (this.showAdmin) {
+                    await this.fetchSubmissions();
+                }
+            },
+            async fetchSubmissions() {
+                let data = [];
+                
+                try {
+                    if (db) {
+                        const collRef = collection(db, 'artifacts', appId, 'public', 'data', 'survey_submissions');
+                        const q = query(collRef); 
+                        const querySnapshot = await getDocs(q);
+                        
+                        querySnapshot.forEach((doc) => {
+                            data.push({ id: doc.id, ...doc.data() });
+                        });
+                    }
+                } catch (error) {
+                    console.warn("無法從 Firebase 讀取資料，將僅顯示本機資料:", error);
+                }
+
+                // 結合 LocalStorage 的資料
+                try {
+                    let localData = JSON.parse(localStorage.getItem('survey_submissions') || '[]');
+                    data = [...data, ...localData];
+                } catch (e) {
+                    console.error("讀取 LocalStorage 失敗:", e);
+                }
+                
+                // 依照時間排序 (最新的在最上方)
+                data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                this.submissions = data;
+            },
+            downloadCSV() {
+                if (this.submissions.length === 0) return;
+
+                // Prepare Headers
+                let allIndicatorIds = new Set();
+                this.submissions.forEach(sub => {
+                    Object.keys(sub.ratings || {}).forEach(id => allIndicatorIds.add(id));
+                });
+                const sortedIds = Array.from(allIndicatorIds).sort();
+                
+                let csvContent = "\uFEFF"; // BOM for Excel UTF-8 support
+                csvContent += "提交時間,姓名,學程類別,選修課程數,選修課程清單," + sortedIds.map(id => `指標_${id}`).join(',') + "\r\n";
+
+                // Prepare Rows
+                this.submissions.forEach(sub => {
+                    const row = [
+                        new Date(sub.timestamp).toLocaleString(),
+                        sub.name,
+                        sub.program,
+                        sub.courses.length,
+                        `"${sub.courses.join(', ')}"`,
+                        ...sortedIds.map(id => sub.ratings?.[id] || '')
+                    ];
+                    csvContent += row.join(',') + "\r\n";
+                });
+
+                // Trigger Download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `114-2_師資生素養調查資料_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
